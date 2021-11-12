@@ -63,6 +63,7 @@ export const components = {
   other: ['/components/config-provider'],
   experimental: [
     '/components/what-is-experimental',
+    '/components/auto-center',
     '/components/desense-text',
     '/components/dropdown',
     '/components/ellipsis',
@@ -71,5 +72,6 @@ export const components = {
     '/components/picker-view',
     '/components/safe-area',
     '/components/tree-select',
+    '/components/virtual-input',
   ],
 }

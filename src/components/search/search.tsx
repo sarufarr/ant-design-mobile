@@ -17,8 +17,9 @@ export type SearchProps = Pick<InputProps, 'onFocus' | 'onBlur' | 'onClear'> & {
   maxLength?: number
   placeholder?: string
   clearable?: boolean
-  showCancelButton?: boolean
+  showCancelButton?: boolean | ((focus: boolean, value: string) => boolean)
   cancelText?: string
+  clearOnCancel?: boolean
   onSearch?: (val: string) => void
   onChange?: (val: string) => void
   onCancel?: () => void
@@ -28,10 +29,18 @@ const defaultProps = {
   clearable: true,
   showCancelButton: false,
   defaultValue: '',
+  clearOnCancel: true,
 }
 
 export const Search = forwardRef<SearchRef, SearchProps>((p, ref) => {
-  const props = mergeProps(defaultProps, p)
+  const { locale } = useConfig()
+  const props = mergeProps(
+    defaultProps,
+    {
+      cancelText: locale.common.cancel,
+    },
+    p
+  )
   const [value, setValue] = usePropsValue(props)
   const [hasFocus, setHasFocus] = useState(false)
   const inputRef = useRef<InputRef>(null)
@@ -42,7 +51,38 @@ export const Search = forwardRef<SearchRef, SearchProps>((p, ref) => {
     blur: () => inputRef.current?.blur(),
   }))
 
-  const { locale } = useConfig()
+  const renderCancelButton = () => {
+    let isShowCancel = false
+    if (typeof props.showCancelButton === 'function') {
+      isShowCancel = props.showCancelButton(hasFocus, value)
+    } else {
+      isShowCancel = props.showCancelButton && hasFocus
+    }
+
+    return (
+      isShowCancel && (
+        <div className={`${classPrefix}-suffix`}>
+          <a
+            onMouseDown={e => {
+              e.preventDefault()
+            }}
+            onTouchStart={e => {
+              e.preventDefault()
+            }}
+            onClick={() => {
+              if (props.clearOnCancel) {
+                inputRef.current?.clear()
+              }
+              inputRef.current?.blur()
+              props.onCancel?.()
+            }}
+          >
+            {props.cancelText}
+          </a>
+        </div>
+      )
+    )
+  }
 
   return withNativeProps(
     props,
@@ -79,25 +119,7 @@ export const Search = forwardRef<SearchRef, SearchProps>((p, ref) => {
           }}
         />
       </div>
-      {props.showCancelButton && hasFocus && (
-        <div className={`${classPrefix}-suffix`}>
-          <a
-            onMouseDown={e => {
-              e.preventDefault()
-            }}
-            onTouchStart={e => {
-              e.preventDefault()
-            }}
-            onClick={() => {
-              inputRef.current?.clear()
-              inputRef.current?.blur()
-              props.onCancel?.()
-            }}
-          >
-            {props.cancelText ?? locale.common.cancel}
-          </a>
-        </div>
-      )}
+      {renderCancelButton()}
     </div>
   )
 })

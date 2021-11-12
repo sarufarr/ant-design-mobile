@@ -2,6 +2,7 @@
 
 <code src="./demos/demo1.tsx"></code>
 <code src="./demos/demo2.tsx"></code>
+<code src="./demos/demo3.tsx"></code>
 
 # API
 
@@ -20,6 +21,7 @@ See for other parameters https://www.npmjs.com/package/rc-field-form
 | ----------- | ------------------------------------ | ---------------------------- | --------------------------------------------------------------------- |
 | label       | Label name                           | `string`                     | --                                                                    |
 | help        | Prompt text                          | `string`                     | --                                                                    |
+| extra       | The right area of the form item.     | `ReactNode`                  | --                                                                    |
 | required    | Whether it is required               | `boolean`                    | `false`（if `rules` is set, it would be judged according to `rules`） |
 | disabled    | Whether it is disabled               | `boolean`                    | `false`                                                               |
 | noStyle     | No styles, only use field management | `boolean`                    | `false`                                                               |

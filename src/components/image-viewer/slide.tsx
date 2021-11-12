@@ -1,4 +1,4 @@
-import React, { FC } from 'react'
+import React, { FC, MutableRefObject, useRef } from 'react'
 import { useGesture } from '@use-gesture/react'
 import { useSpring, animated } from '@react-spring/web'
 
@@ -9,9 +9,12 @@ type Props = {
   maxZoom: number
   onTap: () => void
   onZoomChange?: (zoom: number) => void
+  dragLockRef?: MutableRefObject<boolean>
 }
 
 export const Slide: FC<Props> = props => {
+  const { dragLockRef } = props
+  const controlRef = useRef<HTMLDivElement>(null)
   const [{ zoom, x, y }, api] = useSpring(() => ({
     zoom: 1,
     x: 0,
@@ -19,7 +22,9 @@ export const Slide: FC<Props> = props => {
     config: { tension: 300 },
   }))
 
-  const bind = useGesture(
+  const pinchLockRef = useRef(false)
+
+  useGesture(
     {
       onDrag: state => {
         if (state.tap && state.elapsedTime > 0) {
@@ -28,7 +33,10 @@ export const Slide: FC<Props> = props => {
           return
         }
         const currentZoom = zoom.get()
-        if (currentZoom <= 1) {
+        if (dragLockRef) {
+          dragLockRef.current = currentZoom !== 1
+        }
+        if (!pinchLockRef.current && currentZoom <= 1) {
           api.start({
             x: 0,
             y: 0,
@@ -43,7 +51,9 @@ export const Slide: FC<Props> = props => {
         }
       },
       onPinch: state => {
+        pinchLockRef.current = !state.last
         const [d] = state.offset
+        if (d < 0) return
         // pinch的rubberband不会自动弹回bound，这里手动实现了
         const zoom = state.last ? Math.max(Math.min(d, props.maxZoom), 1) : d
         api.start({
@@ -56,22 +66,27 @@ export const Slide: FC<Props> = props => {
             x: 0,
             y: 0,
           })
+          if (dragLockRef) {
+            dragLockRef.current = false
+          }
+        } else {
+          if (dragLockRef) {
+            dragLockRef.current = true
+          }
         }
       },
     },
     {
+      target: controlRef,
       drag: {
         // filterTaps: true,
         from: () => [x.get(), y.get()],
       },
       pinch: {
-        distanceBounds: {
-          min: 1,
-          max: props.maxZoom,
-        },
-        rubberband: true,
+        transform: ([d, a]) => [d < 0 ? d * 0.5 : d * 2, 0],
         from: () => [zoom.get(), 0],
       },
+      pointer: { touch: true },
     }
   )
 
@@ -84,7 +99,7 @@ export const Slide: FC<Props> = props => {
         }
       }}
     >
-      <div className={`${classPrefix}-control`} {...bind()}>
+      <div className={`${classPrefix}-control`} ref={controlRef}>
         <animated.div
           className={`${classPrefix}-image-wrapper`}
           style={{ scale: zoom, x, y }}
