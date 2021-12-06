@@ -1,26 +1,35 @@
-import React, { useState, useEffect, ReactNode, FC } from 'react'
+import React, {
+  useState,
+  useEffect,
+  ReactNode,
+  FC,
+  memo,
+  useCallback,
+} from 'react'
 import Popup, { PopupProps } from '../popup'
 import { mergeProps } from '../../utils/with-default-props'
 import { NativeProps, withNativeProps } from '../../utils/native-props'
 import { usePropsValue } from '../../utils/use-props-value'
-import { PickerColumn, PickerColumnItem, PickerValue } from './index'
+import {
+  PickerColumn,
+  PickerColumnItem,
+  PickerValue,
+  PickerValueExtend,
+} from './index'
 import PickerView from '../picker-view'
 import { useColumns } from '../picker-view/use-columns'
 import { useConfig } from '../config-provider'
-import { useLazyMemo } from '../../utils/use-lazy-memo'
+import { usePickerValueExtend } from '../picker-view/use-picker-value-extend'
+import { usePersistFn } from 'ahooks'
 
 const classPrefix = `adm-picker`
-
-type PickerValueContext = {
-  items: (PickerColumnItem | null)[]
-}
 
 export type PickerProps = {
   columns: PickerColumn[] | ((value: PickerValue[]) => PickerColumn[])
   value?: PickerValue[]
   defaultValue?: PickerValue[]
-  onSelect?: (value: PickerValue[], context: PickerValueContext) => void
-  onConfirm?: (value: PickerValue[], context: PickerValueContext) => void
+  onSelect?: (value: PickerValue[], extend: PickerValueExtend) => void
+  onConfirm?: (value: PickerValue[], extend: PickerValueExtend) => void
   onCancel?: () => void
   onClose?: () => void
   visible?: boolean
@@ -38,7 +47,7 @@ const defaultProps = {
   defaultValue: [],
 }
 
-export const Picker: FC<PickerProps> = p => {
+export const Picker = memo<PickerProps>(p => {
   const { locale } = useConfig()
   const props = mergeProps(
     defaultProps,
@@ -49,21 +58,16 @@ export const Picker: FC<PickerProps> = p => {
     p
   )
 
-  const controllable = usePropsValue({
-    value: props.value,
-    defaultValue: props.defaultValue,
+  const [value, setValue] = usePropsValue({
+    ...props,
     onChange: val => {
-      props.onConfirm?.(val, context)
+      props.onConfirm?.(val, generateValueExtend(val))
     },
   })
-  const value = controllable[0] as PickerValue[]
-  const setValue = controllable[1]
 
-  const context: PickerValueContext = {
-    get items() {
-      return getItems()
-    },
-  }
+  // TODO: columns generated twice in Picker and PickerView, which can be improved
+  const columns = useColumns(props.columns, value)
+  const generateValueExtend = usePickerValueExtend(columns)
 
   const [innerValue, setInnerValue] = useState<PickerValue[]>(value)
   useEffect(() => {
@@ -77,8 +81,12 @@ export const Picker: FC<PickerProps> = p => {
     }
   }, [value])
 
-  const innerColumns = useColumns(props.columns, innerValue)
-  const columns = useColumns(props.columns, value)
+  const onChange = usePersistFn((val, ext) => {
+    setInnerValue(val)
+    if (props.visible) {
+      props.onSelect?.(val, ext)
+    }
+  })
 
   const pickerElement = withNativeProps(
     props,
@@ -106,14 +114,9 @@ export const Picker: FC<PickerProps> = p => {
       </div>
       <div className={`${classPrefix}-body`}>
         <PickerView
-          columns={innerColumns}
+          columns={props.columns}
           value={innerValue}
-          onChange={val => {
-            setInnerValue(val)
-            if (props.visible) {
-              props.onSelect?.(val, context)
-            }
-          }}
+          onChange={onChange}
         />
       </div>
     </div>
@@ -138,18 +141,10 @@ export const Picker: FC<PickerProps> = p => {
     </Popup>
   )
 
-  const getItems = useLazyMemo(() => {
-    return value.map((v, index) => {
-      const column = columns[index]
-      if (!column) return null
-      return column.find(item => item.value === v) ?? null
-    })
-  }, [value, columns])
-
   return (
     <>
       {popupElement}
-      {props.children?.(getItems())}
+      {props.children?.(generateValueExtend(value).items)}
     </>
   )
-}
+})
